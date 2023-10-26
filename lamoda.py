@@ -28,7 +28,7 @@ class LamodaParser(ChromeParser):
         self.__bad_img = 0
         self.__started = None
         self.__finished = None
-        self.__output_dir = check_folder_create(Path(__file__).parent)
+        self.__output_dir = check_folder_create(Path(__file__).parent / 'output')
 
 
 
