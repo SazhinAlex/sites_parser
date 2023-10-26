@@ -14,7 +14,8 @@ class LamodaParser(ChromeParser):
             '--ignore-certificate-errors',
             '--no-first-run',
             '--log-level=3',
-            '--ignore-certificate-errors-spki-list'
+            '--ignore-certificate-errors-spki-list',
+            '--ignore-ssl-errors'
         )
         super().__init__(*chrome_options)
 
