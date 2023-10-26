@@ -1,4 +1,4 @@
-from sites_parser import ChromeParser
+from sites_parser import ChromeParser, check_folder_create
 from pathlib import Path
 from time import time, sleep
 from selenium.webdriver.common.by import By
@@ -24,11 +24,12 @@ class LamodaParser(ChromeParser):
         # self.__mlink_active_class = "router-link-exact-active"
         # self.__arrow_class = 'ui-catalog-tree-arrow-icon-level-2'
         self.__delay_s = 3
-        self.__output_dir = Path.cwd() / f'output_{int(time() * 1000)}'
         self.__img_dowloaded = 0
         self.__bad_img = 0
         self.__started = None
         self.__finished = None
+        self.__output_dir = check_folder_create(Path(__file__).parent)
+
 
 
     def __get_menu_tag_list(self, *args, **kwargs) -> tuple:
@@ -85,8 +86,7 @@ class LamodaParser(ChromeParser):
             self._driver.get(go_to_link)
             print(f'Log: Transition to {go_to_link}')
             save_pth = self.__output_dir / li[0] if not t_pth else t_pth / li[0]
-            if not save_pth.exists() or not save_pth.is_dir():
-                save_pth.mkdir()
+            save_pth = check_folder_create(save_pth)
             inner_ul = self.__get_inner_menu_links(li)
             if len(inner_ul) > 0:
 
@@ -96,8 +96,8 @@ class LamodaParser(ChromeParser):
 
     def start(self, *args, **kwargs) -> None:
         self.__started = time()
-        if not self.__output_dir.is_dir() or not self.__output_dir.exists():
-            self.__output_dir.mkdir()
+        self.__output_dir = self.__output_dir / f'output_{int(time() * 1000)}'
+        self.__output_dir = check_folder_create(self.__output_dir)
         self._driver.get(self.__lamoda_url_w)
         cat_list = self.__get_menu_tag_list()
         self.__rwalk(l=cat_list)

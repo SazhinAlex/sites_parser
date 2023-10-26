@@ -1,4 +1,12 @@
 from selenium import webdriver
+from pathlib import Path
+    
+
+def check_folder_create(pth: Path) -> Path:
+    if not pth.is_dir() or not pth.exists():
+        pth.mkdir()
+
+    return pth
 
 
 class ChromeParser(object):

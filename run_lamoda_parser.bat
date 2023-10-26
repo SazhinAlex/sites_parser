@@ -1,1 +1,2 @@
-pipenv shell && python lamoda_parser.py
+@ECHO OFF
+pipenv run python lamoda_parser.py
