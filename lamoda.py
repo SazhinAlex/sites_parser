@@ -25,7 +25,7 @@ class LamodaParser(ChromeParser):
         self.__lamoda_menu_xpath = "//div[@id='catalog-main']/div[1]/div[1]/div[1]/div[2]/ul[1]"
         # self.__mlink_active_class = "router-link-exact-active"
         # self.__arrow_class = 'ui-catalog-tree-arrow-icon-level-2'
-        self.__delay_s = 3
+        self.__delay_s = kwargs['mdelay']
         self.__img_dowloaded = 0
         self.__bad_img = 0
         self.__started = None
