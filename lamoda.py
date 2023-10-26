@@ -28,8 +28,8 @@ class LamodaParser(ChromeParser):
         self.__delay_s = kwargs['mdelay']
         self.__img_dowloaded = 0
         self.__bad_img = 0
-        self.__started = None
-        self.__finished = None
+        self.__started = 0.0
+        self.__finished = 0.0
         self.__output_dir = check_folder_create(Path(__file__).parent / 'output')
 
 
