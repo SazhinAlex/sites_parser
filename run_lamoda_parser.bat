@@ -1,0 +1,1 @@
+pipenv shell && python lamoda_parser.py
