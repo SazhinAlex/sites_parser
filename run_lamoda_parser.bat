@@ -1,2 +1,3 @@
 @ECHO OFF
-pipenv run python lamoda_parser.py
+
+git pull & pipenv run python lamoda_parser.py
