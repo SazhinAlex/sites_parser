@@ -4,7 +4,7 @@ from time import time, sleep
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 from sqlalchemy import create_engine, Column, String, Integer
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, Session
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -123,8 +123,7 @@ class LamodaParser(ChromeParser):
 
         self.__engine = create_engine(f"sqlite:///{str(self.__root.dir)}/db.sqlite3")
         Base.metadata.create_all(self.__engine)
-        self.__Session = sessionmaker()
-        self.__Session.configure(bind=self.__engine)
+        self.__Session = Session(self.__engine)
 
 
     def __get_card_data(self, url: str, save_pth: Path) -> LamodaItem:
