@@ -8,7 +8,7 @@ from sqlalchemy.orm import declarative_base, Session
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 
 
 Base = declarative_base()
@@ -104,7 +104,8 @@ class LamodaParser(ChromeParser):
         self.__forward_xpath = "//div[text()='Дальше']/ancestor::a[contains(@class,'router-link-active')]"
         self.__card_xpath = '//a[contains(@class, "x-product-card__pic-catalog")]'
         self.__promo1_close = "//div[contains(@class, 'icon_cross-thin-white')]"
-        self.__img_xpath = ".//img[contains(@class, 'x-product-card__pic-img')]" 
+        self.__img_xpath = ".//img[contains(@class, 'x-product-card__pic-img')]"
+        self.__img_big_xpath = ".//img[contains(@class, '_image_lpxn') and ancestor::div[@id='reviews-and-questions']]" 
         self.__delay_s = kwargs['mdelay']
         self.__fail_wait = 60
         self.__img_dowloaded = 0
@@ -127,13 +128,14 @@ class LamodaParser(ChromeParser):
 
 
     def __get_card_data(self, url: str, save_pth: Path) -> LamodaItem:
+        
         try_webdriver_get(url, self._driver)
         WebDriverWait(self._driver, 10).until(EC.element_to_be_clickable((By.XPATH, self.__promo1_close))).click()
-        item = LamodaItem()
-        card_div = self._driver.find_element(By.XPATH, "//div[@id='reviews-and-questions']")
-        img = card_div.find_element(By.XPATH, ".//img[contains(@class, '_image_lpxn')]")
+        img = self._driver.find_element(By.XPATH, self.__img_big_xpath)
         img_url = img.get_dom_attribute('src')
         img_url = 'https:' + img_url
+
+        item = LamodaItem()
         try:
             item.materials = self._driver.find_element(
                 By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-material_filling')]"
