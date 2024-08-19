@@ -131,6 +131,7 @@ class LamodaParser(ChromeParser):
         
         try_webdriver_get(url, self._driver)
         WebDriverWait(self._driver, 10).until(EC.element_to_be_clickable((By.XPATH, self.__promo1_close))).click()
+        self._driver.execute_script('window.stop();')
         img = self._driver.find_element(By.XPATH, self.__img_big_xpath)
         img_url = img.get_dom_attribute('src')
         img_url = 'https:' + img_url
