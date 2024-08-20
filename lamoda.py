@@ -8,7 +8,8 @@ from sqlalchemy.orm import declarative_base, Session
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, TimeoutException
+from lxml import etree
 
 
 Base = declarative_base()
@@ -35,11 +36,20 @@ def try_webdriver_get(url: str, driver: webdriver.Chrome, fail_wait = 5.0, limit
                 raise PExeption(f'После {counter} попыток не удалось получить данные с {url} Работа завершена.')
             sleep(fail_wait)
 
+def etree_from_driver(driver: webdriver.Chrome):
+    soup = BeautifulSoup(driver.page_source, 'lxml')
+    return etree.HTML(str(soup))
+
+def get_etree_html(url: str, driver: webdriver.Chrome, fail_wait = 5.0, limit = 5):
+    try_webdriver_get(url, driver, fail_wait, limit)
+    soup = BeautifulSoup(driver.page_source, 'lxml')
+    return etree.HTML(str(soup))
 
 
 class LamodaItem(Base):
     __tablename__ = "LamodaItems"
 
+    
     id = Column(Integer, primary_key=True)
     img_rel_path = Column(String)
     materials = Column(String)
@@ -56,6 +66,8 @@ class LamodaItem(Base):
     clasp = Column(String)
     sku = Column(String)
     description = Column(String)
+    prod_url = Column(String)
+    img_url = Column(String)
 
 
 
@@ -127,117 +139,57 @@ class LamodaParser(ChromeParser):
 
 
     def __get_card_data(self, url: str, save_pth: Path) -> LamodaItem:
-        
         try_webdriver_get(url, self._driver)
-        WebDriverWait(self._driver, 10).until(EC.element_to_be_clickable((By.XPATH, self.__promo1_close))).click()
-        self._driver.execute_script('window.stop();')
-        card_div = self._driver.find_element(By.XPATH, "//div[@id='reviews-and-questions']")
-        WebDriverWait(self._driver, 10).until(EC.presence_of_element_located((By.XPATH, self.__img_xpath)))
-        img = card_div.find_element(By.XPATH, self.__img_xpath)
-        img_url = img.get_dom_attribute('src')
+        '''WebDriverWait(
+            self._driver, 5, ignored_exceptions=[TimeoutException]
+            ).until(EC.element_to_be_clickable((By.XPATH, self.__promo1_close))).click()'''
+        dom = etree_from_driver(self._driver)
+        card_div = dom.xpath("//div[@id='reviews-and-questions']")
+        #selenium_to_file(self._driver)
+        img = dom.xpath("//img[contains(@class, '_image_1') and ancestor::div[contains(@class, 'ui-product-page-gallery')]]")
+        img_url = img[0].attrib['src']
         img_url = 'https:' + img_url
 
         item = LamodaItem()
-        try:
-            item.materials = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-material_filling')]"
-                ).text
-        except NoSuchElementException:
-            item.materials = ''
 
+        item.prod_url = url
+        item.img_url = img_url
+        #materials = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-material_filling')]")
+        #item.materials = materials[0].text.strip() if len(materials) > 0 else ''
+        #size_on_model = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-correspond_to_size')]")
+        #item.size_on_model = size_on_model[0].text.strip() if len(size_on_model) > 0 else ''
+        #model_params = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-model_parameters')]")
+        #item.model_params = model_params[0].text.strip() if len(model_params) > 0 else ''
+        #model_heigh = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-model_height_on_photo')]")
+        #item.model_heigh = model_heigh[0].text.strip() if len(model_heigh) > 0 else ''
+        #length = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-length')]")
+        #item.lenght = length[0].text.strip() if len(length) > 0 else ''
+        #season = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-season_wear')]")
+        #item.season = season[0].text.strip() if len(season) > 0 else ''
+        #color = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-color_family')]")
+        #item.color = color[0].text.strip() if len(color) > 0 else ''
+        #cloth_print = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-print')]")
+        #item.print = cloth_print[0].text.strip() if len(cloth_print) > 0 else ''
+        #knitwear = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-type_of_knitwear')]")
+        #item.knitwear = knitwear[0].text.strip() if len(knitwear) > 0 else ''
+        #guarantee = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-guarantee_period')]")
+        #item.guarantee = guarantee[0].text.strip() if len(guarantee) > 0 else ''
+        #prod_country = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-production_country')]")
+        #item.prod_country = prod_country[0].text.strip() if len(prod_country) > 0 else ''
+        #clasp = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-clothes_clasp')]")
+        #item.clasp = clasp[0].text.strip() if len(clasp) > 0 else ''
+        sku = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-sku')]")
         try:
-            item.size_on_model = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-correspond_to_size')]"
-                ).text
-        except NoSuchElementException:
-            item.size_on_model = ''
-
-        try:
-            item.model_params = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-model_parameters')]"
-                ).text
-        except NoSuchElementException:
-            item.model_params = ''
-
-        try:            
-            item.model_heigh = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-model_height_on_photo')]"
-                ).text
-        except NoSuchElementException:
-            item.model_heigh = ''
-
-        try:
-            item.lenght = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-length')]"
-                ).text
-        except NoSuchElementException:
-            item.lenght = ''
-
-        try:
-            item.season = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-season_wear')]"
-                ).text
-        except NoSuchElementException:
-            item.season = ''
-
-        try:
-            item.color = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-color_family')]"
-                ).text
-        except NoSuchElementException:
-            item.color = ''
-
-        try:
-            item.print = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-print')]"
-                ).text
-        except NoSuchElementException:
-            item.print = ''
-
-        try:
-            item.knitwear = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-type_of_knitwear')]"
-                ).text
-        except NoSuchElementException:
-            item.knitwear = ''
-
-        try:
-            item.guarantee = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-guarantee_period')]"
-                ).text
-        except NoSuchElementException:
-            item.guarantee = ''
-
-        try:
-            item.prod_country = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-production_country')]"
-                ).text
-        except NoSuchElementException:
-            item.prod_country = ''
-
-        try:
-            item.clasp = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-clothes_clasp')]"
-                ).text
-        except NoSuchElementException:
-            item.clasp = ''
-
-        try:
-            item.sku = self._driver.find_element(
-                By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-sku')]"
-                ).text
-        except NoSuchElementException:
+            item.sku = sku[0].text.strip()
+        except Exception:
             item.sku = ''
-
+  
+        description = card_div[0].xpath(".//span[ancestor::div[contains(@class, '_description_')]]")
         try:
-            desc_div = card_div.find_element(By.XPATH, ".//span[ancestor::div[contains(@class, '_description_')]]")
-        except NoSuchElementException:
+            item.description = description[0].text.strip()
+        except:
             item.description = ''
 
-        desc_text = desc_div.text.strip()
-        if desc_text != '':
-            item.description = desc_text
-            
         img_responce = try_request(img_url)
         img_path = img_url.split('/')[-1]
         img_path = save_pth / img_path
@@ -278,18 +230,20 @@ class LamodaParser(ChromeParser):
         forward = []
         url = node.url
         while len(forward) > 0 or run == 0:
-            try_webdriver_get(url, self._driver)
-            forward = self._driver.find_elements(By.XPATH, self.__forward_xpath)
-            card_links = self._driver.find_elements(By.XPATH, self.__card_xpath)
+            dom = get_etree_html(url, self._driver)
+            forward = dom.xpath(self.__forward_xpath)
+            card_links = dom.xpath(self.__card_xpath)
 
             if len(card_links) == 0:
                 raise PExeption(f'Ошибка! Не удалось получить список товаров. Структура сайта возможно была изменена.')
             
             for link in card_links:
                 sleep(self.__delay_s)
-                href = link.get_dom_attribute('href')
+                href = link.attrib['href']
                 href = self.__lamoda_url_base + href
                 item = self.__get_card_data(href, node.dir)
+                self.__img_dowloaded += 1
+                print(f'Скачано: {self.__img_dowloaded}', end='\r')
                 self.__Session.add(item)
 
             run += 1

@@ -36,7 +36,7 @@ class ChromeParser(object):
             options.add_argument(arg)
 
         self._driver = webdriver.Chrome(options=options)
-        self._driver.set_page_load_timeout(5)
+        self._driver.set_page_load_timeout(120)
 
     
     def start(self, *args, **kwargs) -> None:
