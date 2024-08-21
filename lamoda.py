@@ -184,8 +184,8 @@ class LamodaParser(ChromeParser):
         except Exception:
             item.sku = ''
   
-        description = card_div[0].xpath(".//span[ancestor::div[contains(@class, '_description_')]]")
         try:
+            description = card_div[0].xpath(".//span[ancestor::div[contains(@class, '_description_')]]")
             item.description = description[0].text.strip()
         except:
             item.description = ''
