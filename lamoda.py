@@ -142,8 +142,10 @@ class LamodaParser(ChromeParser):
 
     def __get_card_data(self, url: str, save_pth: Path) -> LamodaItem:
         try_webdriver_get(url, self._driver)
-        dom = etree_from_driver(self._driver)
         
+        WebDriverWait(self._driver, 60
+                          ).until(EC.presence_of_element_located((By.XPATH, self.__img_xpath)))
+        dom = etree_from_driver(self._driver)
         img = dom.xpath(self.__img_xpath)
         img_url = img[0].attrib['src']
         img_url = 'https:' + img_url
