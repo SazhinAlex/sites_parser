@@ -117,6 +117,7 @@ class LamodaParser(ChromeParser):
         self.__forward_xpath = "//a[contains(@class, 'router-link-active') and descendant::div[text()='Дальше']]"
         self.__card_xpath = '//a[contains(@class, "x-product-card__pic-catalog")]'
         self.__promo1_close = "//div[contains(@class, 'icon_cross-thin-white')]"
+        self.__promo2_close = "//div[@title='Закрыть' and contains(@class, 'icon_cross-thin-white') and ancestor::div[@class='d-modal__close-button']]"
         self.__img_xpath = "//img[contains(@class, '_image_1') and ancestor::div[contains(@class, 'ui-product-page-gallery')]]"
         self.__desc_xpath = "//span[ancestor::div[contains(@class, '_description_') and ancestor::div[contains(@id, 'reviews-and-questions')]]]"
         self.__delay_s = kwargs['mdelay']
@@ -143,6 +144,11 @@ class LamodaParser(ChromeParser):
     def __get_card_data(self, url: str, save_pth: Path) -> LamodaItem:
         try_webdriver_get(url, self._driver)
         
+        dom = etree_from_driver(self._driver)
+        promo1 = dom.xpath(self.__promo2_close)
+        if len(promo1) > 0:
+            WebDriverWait(self._driver, 60
+                          ).until(EC.element_to_be_clickable((By.XPATH, self.__promo2_close))).click()
         WebDriverWait(self._driver, 60
                           ).until(EC.presence_of_element_located((By.XPATH, self.__img_xpath)))
         dom = etree_from_driver(self._driver)
