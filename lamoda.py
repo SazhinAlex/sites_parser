@@ -118,6 +118,7 @@ class LamodaParser(ChromeParser):
         self.__card_xpath = '//a[contains(@class, "x-product-card__pic-catalog")]'
         self.__promo1_close = "//div[contains(@class, 'icon_cross-thin-white')]"
         self.__img_xpath = "//img[contains(@class, '_image_1') and ancestor::div[contains(@class, 'ui-product-page-gallery')]]"
+        self.__desc_xpath = "//span[ancestor::div[contains(@class, '_description_') and ancestor::div[contains(@id, 'reviews-and-questions')]]]"
         self.__delay_s = kwargs['mdelay']
         self.__fail_wait = 60
         self.__img_dowloaded = 0
@@ -142,7 +143,7 @@ class LamodaParser(ChromeParser):
     def __get_card_data(self, url: str, save_pth: Path) -> LamodaItem:
         try_webdriver_get(url, self._driver)
         dom = etree_from_driver(self._driver)
-        card_div = dom.xpath("//div[@id='reviews-and-questions']")
+        
         img = dom.xpath(self.__img_xpath)
         img_url = img[0].attrib['src']
         img_url = 'https:' + img_url
@@ -182,7 +183,7 @@ class LamodaParser(ChromeParser):
             item.sku = ''
   
         try:
-            description = card_div[0].xpath(".//span[ancestor::div[contains(@class, '_description_')]]")
+            description = dom.xpath(self.__desc_xpath)
             item.description = description[0].text.strip()
         except:
             item.description = ''

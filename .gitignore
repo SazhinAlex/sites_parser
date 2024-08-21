@@ -3,3 +3,4 @@ __pycache__
 output_*
 output/
 dump_*.txt
+test_*.py
