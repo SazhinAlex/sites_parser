@@ -3,12 +3,12 @@ from pathlib import Path
 from time import time, sleep
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
-from sqlalchemy import create_engine, Column, String, Integer
+from sqlalchemy import create_engine, Column, String
 from sqlalchemy.orm import declarative_base, Session
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, TimeoutException
+#from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, TimeoutException
 from lxml import etree
 
 
@@ -65,6 +65,7 @@ class LamodaItem(Base):
     #prod_country = Column(String)
     #clasp = Column(String)
     #sku = Column(String)
+    price = Column(String)
     description = Column(String)
     prod_url = Column(String)
     img_url = Column(String)
@@ -184,6 +185,13 @@ class LamodaParser(ChromeParser):
         #item.prod_country = prod_country[0].text.strip() if len(prod_country) > 0 else ''
         #clasp = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-clothes_clasp')]")
         #item.clasp = clasp[0].text.strip() if len(clasp) > 0 else ''
+
+        price = dom.xpath("//span[contains(@aria-label, 'Итоговая цена')]")
+        try:
+            item.price = price[0].text.strip()
+        except Exception:
+            item.price = ''
+            
         sku = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-sku')]")
         try:
             item.sku = sku[0].text.strip()
