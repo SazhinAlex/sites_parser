@@ -3,7 +3,7 @@ from pathlib import Path
 from time import time, sleep
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
-from sqlalchemy import create_engine, Column, String
+from sqlalchemy import create_engine, Column, String, Integer
 from sqlalchemy.orm import declarative_base, Session
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
@@ -191,7 +191,7 @@ class LamodaParser(ChromeParser):
             item.price = price[0].text.strip()
         except Exception:
             item.price = ''
-            
+
         sku = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-sku')]")
         try:
             item.sku = sku[0].text.strip()
