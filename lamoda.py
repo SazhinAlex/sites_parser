@@ -104,7 +104,8 @@ class LamodaParser(ChromeParser):
             '--log-level=3',
             '--ignore-certificate-errors-spki-list',
             '--ignore-ssl-errors',
-            '--log-level=3'
+            '--log-level=3',
+            '--window-size=2560,1440'
         )
         super().__init__(*chrome_options)
 
@@ -113,10 +114,10 @@ class LamodaParser(ChromeParser):
         self.__selected = 'x-tree-view-catalog-navigation__category_selected'
         self.__subtree = 'x-tree-view-catalog-navigation__subtree'
         self.__found = 'x-tree-view-catalog-navigation__found'
-        self.__forward_xpath = "//div[text()='Дальше']/ancestor::a[contains(@class,'router-link-active')]"
+        self.__forward_xpath = "//a[contains(@class, 'router-link-active') and descendant::div[text()='Дальше']]"
         self.__card_xpath = '//a[contains(@class, "x-product-card__pic-catalog")]'
         self.__promo1_close = "//div[contains(@class, 'icon_cross-thin-white')]"
-        self.__img_xpath = "//img[contains(@class, '_image_lpxn') and ancestor::div[@id='reviews-and-questions']]"
+        self.__img_xpath = "//img[contains(@class, '_image_1') and ancestor::div[contains(@class, 'ui-product-page-gallery')]]"
         self.__delay_s = kwargs['mdelay']
         self.__fail_wait = 60
         self.__img_dowloaded = 0
@@ -140,13 +141,9 @@ class LamodaParser(ChromeParser):
 
     def __get_card_data(self, url: str, save_pth: Path) -> LamodaItem:
         try_webdriver_get(url, self._driver)
-        '''WebDriverWait(
-            self._driver, 5, ignored_exceptions=[TimeoutException]
-            ).until(EC.element_to_be_clickable((By.XPATH, self.__promo1_close))).click()'''
         dom = etree_from_driver(self._driver)
         card_div = dom.xpath("//div[@id='reviews-and-questions']")
-        #selenium_to_file(self._driver)
-        img = dom.xpath("//img[contains(@class, '_image_1') and ancestor::div[contains(@class, 'ui-product-page-gallery')]]")
+        img = dom.xpath(self.__img_xpath)
         img_url = img[0].attrib['src']
         img_url = 'https:' + img_url
 
@@ -230,10 +227,24 @@ class LamodaParser(ChromeParser):
         forward = []
         url = node.url
         while len(forward) > 0 or run == 0:
-            dom = get_etree_html(url, self._driver)
-            forward = dom.xpath(self.__forward_xpath)
-            card_links = dom.xpath(self.__card_xpath)
+            try_webdriver_get(url, self._driver)
+            WebDriverWait(self._driver, 60
+                          ).until(EC.presence_of_element_located((By.XPATH, self.__card_xpath)))
+            
+            self._driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
+            try:
+                WebDriverWait(self._driver, 20
+                              ).until(EC.presence_of_element_located((By.XPATH, self.__forward_xpath)))
+            except Exception:
+                forward = []
+                #screen_path = self.__root.dir / 'screenshot.png'
+                #self._driver.save_screenshot(screen_path)
+
+            dom = etree.HTML(self._driver.page_source)
+            card_links = dom.xpath(self.__card_xpath)
+            forward = dom.xpath(self.__forward_xpath)
+            
             if len(card_links) == 0:
                 raise PExeption(f'Ошибка! Не удалось получить список товаров. Структура сайта возможно была изменена.')
             
@@ -249,9 +260,7 @@ class LamodaParser(ChromeParser):
             run += 1
 
             if len(forward) > 0:
-                forward_link = forward[0]
-                forward_link = forward_link.find_element(By.XPATH, "//a[contains(@class,'router-link-active')]")
-                forward_link = forward_link.get_dom_attribute('href')
+                forward_link = forward[0].attrib['href']
                 url = self.__lamoda_url_base + forward_link
 
 
