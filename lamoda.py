@@ -8,11 +8,62 @@ from sqlalchemy.orm import declarative_base, Session
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-#from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, TimeoutException
+from selenium.webdriver.remote.webelement import WebElement
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, TimeoutException
 from lxml import etree
 
 
+downloaded = 0
+desc_xpath = "//span[ancestor::div[contains(@class, '_description_') and ancestor::div[contains(@id, 'reviews-and-questions')]]]"
+img_xpath = "//img[contains(@class, '_image_1') and ancestor::div[contains(@class, 'ui-product-page-gallery')]]"
+promo2_close = "//div[@title='Закрыть' and contains(@class, 'icon_cross-thin-white') and ancestor::div[@class='d-modal__close-button']]"
+lamoda_url_w = 'https://www.lamoda.ru/c/355/clothes-zhenskaya-odezhda/'
+card_link = "//a[@role='link' and contains(@class, 'x-product-card__pic-catalog')]"
+forward_xpath = "//a[contains(@class, 'router-link-active') and descendant::div[text()='Дальше']]"
+sub_arrow = ".//div[contains(@class, 'ui-catalog-tree-arrow-icon-level-2')]"
+exact_dir = check_folder_create(output_dir / f'output_{int(time() * 1000)}')
+engine = create_engine(f"sqlite:///{str(exact_dir)}/db.sqlite3")
 Base = declarative_base()
+
+
+
+
+class LamodaItem(Base):
+    __tablename__ = "LamodaItem"
+
+    id = Column(Integer, primary_key=True)
+    img_rel_path = Column(String)
+    materials = Column(String)
+    size_on_model = Column(String)
+    model_params = Column(String)
+    model_heigh = Column(String)
+    lenght = Column(String)
+    season = Column(String)
+    color = Column(String)
+    print = Column(String)
+    knitwear = Column(String)
+    guarantee = Column(String)
+    prod_country = Column(String)
+    clasp = Column(String)
+    sku = Column(String)
+    price = Column(String)
+    description = Column(String)
+    prod_url = Column(String)
+    img_url = Column(String)
+
+
+Base.metadata.create_all(engine)
+Session = Session(engine)
+
+
+def links_to_dict(links: list[WebElement]) -> dict:
+    if len(links) == 0:
+        raise ValueError('Пустой список недопустим!')
+    result = {}
+    for link in links:
+        result[link.text.strip()] = link.get_attribute('href')
+    
+    return result
 
 
 def selenium_to_file(web_driver, print_info = True):
@@ -24,7 +75,7 @@ def selenium_to_file(web_driver, print_info = True):
 
 
 
-def try_webdriver_get(url: str, driver: webdriver.Chrome, fail_wait = 5.0, limit = 5):
+def try_webdriver_get(url: str, driver: webdriver.Chrome, fail_wait = 120.0, limit = 5000):
     counter = 0
     while counter < limit:
         try:
@@ -36,9 +87,11 @@ def try_webdriver_get(url: str, driver: webdriver.Chrome, fail_wait = 5.0, limit
                 raise PExeption(f'После {counter} попыток не удалось получить данные с {url} Работа завершена.')
             sleep(fail_wait)
 
+
 def etree_from_driver(driver: webdriver.Chrome):
     soup = BeautifulSoup(driver.page_source, 'lxml')
     return etree.HTML(str(soup))
+
 
 def get_etree_html(url: str, driver: webdriver.Chrome, fail_wait = 5.0, limit = 5):
     try_webdriver_get(url, driver, fail_wait, limit)
@@ -46,67 +99,174 @@ def get_etree_html(url: str, driver: webdriver.Chrome, fail_wait = 5.0, limit = 
     return etree.HTML(str(soup))
 
 
-class LamodaItem(Base):
-    __tablename__ = "LamodaItems"
+def get_card_data(url: str, save_pth: Path, driver: webdriver.Chrome) -> LamodaItem:
+    try_webdriver_get(url, driver)
+    
+    promo = driver.find_elements(By.XPATH, promo2_close)
+    if len(promo) > 0:
+        WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, promo2_close))).click()
+
+    imgs = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, img_xpath)))
+    img_url = imgs[0].get_attribute('src')
+
+    item = LamodaItem()
+
+    item.prod_url = url
+    item.img_url = img_url
+    try:
+        item.materials = driver.find_element(
+            By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-material_filling')]"
+            ).text
+    except NoSuchElementException:
+        item.materials = ''
+
+    try:
+        item.size_on_model = driver.find_element(
+            By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-correspond_to_size')]"
+            ).text
+    except NoSuchElementException:
+        item.size_on_model = ''
+
+    try:
+        item.model_params = driver.find_element(
+            By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-model_parameters')]"
+            ).text
+    except NoSuchElementException:
+        item.model_params = ''
+
+    try:            
+        item.model_heigh = driver.find_element(
+            By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-model_height_on_photo')]"
+            ).text
+    except NoSuchElementException:
+        item.model_heigh = ''
+
+    try:
+        item.lenght = driver.find_element(
+            By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-length')]"
+            ).text
+    except NoSuchElementException:
+        item.lenght = ''
+
+    try:
+        item.season = driver.find_element(
+            By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-season_wear')]"
+            ).text
+    except NoSuchElementException:
+        item.season = ''
+
+    try:
+        item.color = driver.find_element(
+            By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-color_family')]"
+            ).text
+    except NoSuchElementException:
+        item.color = ''
 
     
-    id = Column(Integer, primary_key=True)
-    #img_rel_path = Column(String)
-    #materials = Column(String)
-    #size_on_model = Column(String)
-    #model_params = Column(String)
-    #model_heigh = Column(String)
-    #lenght = Column(String)
-    #season = Column(String)
-    #color = Column(String)
-    #print = Column(String)
-    #knitwear = Column(String)
-    #guarantee = Column(String)
-    #prod_country = Column(String)
-    #clasp = Column(String)
-    #sku = Column(String)
-    price = Column(String)
-    description = Column(String)
-    prod_url = Column(String)
-    img_url = Column(String)
+    try:
+        price = driver.find_element(By.XPATH, "//span[contains(@aria-label, 'Итоговая цена')]")
+        item.price = price.text.strip()
+    except Exception:
+        item.price = ''
+
+    
+    try:
+        sku = driver.find_element(By.XPATH, "//span[contains(@class, 'ui-product-description-attribute-sku')]")
+        item.sku = sku.text.strip()
+    except Exception:
+        item.sku = ''
+
+    try:
+        description = driver.find_element(By.XPATH, desc_xpath)
+        item.description = description.text.strip()
+    except:
+        item.description = ''
+
+    img_responce = try_request(img_url)
+    img_path = img_url.split('/')[-1]
+    img_path = save_pth / img_path
+
+    with open(img_path, 'wb') as file:
+        file.write(img_responce.content)
+
+    item.img_rel_path = str(img_path.relative_to(Path(__file__).parent))
+    
+    return item
 
 
+def process_items(loc: dict, dir: Path, driver: webdriver.Chrome):
+    cnt = 0
+    url_togo = loc['url']
+    forward = None
+    run = 0
+    while forward or run == 0:
+        try_webdriver_get(url_togo, driver)
+        cards = WebDriverWait(driver, 60).until(EC.presence_of_all_elements_located((By.XPATH, card_link)))
+        try:
+            forward = WebDriverWait(
+                driver, 
+                10, 
+                ignored_exceptions=(NoSuchElementException, TimeoutException)
+                ).until(EC.presence_of_element_located((By.XPATH, forward_xpath)))
+        except TimeoutException:
+            forward = None
 
-class LamodaTreeNode():
-    def __init__(self, data, url, cnt = 0, dir: Path|None = None) -> None:
-        self.data = data
-        self.url = url
-        self.cnt = cnt
-        self.parent = None
-        self.children = []
-        self.dir = dir
+        if forward:
+            url_togo = forward.get_attribute('href')
+        hrefs = [a.get_attribute('href') for a in cards]
+        for href in hrefs:
+            item = get_card_data(href, dir, driver)
+            Session.add(item)
+            Session.commit()
+            cnt += 1
+            print(f'Скачано: {cnt}', end='\r', flush=True)
 
-    def add_child(self, node: 'LamodaTreeNode') -> None:
-        node.parent = self
-        self.children.append(node)
+        run += 1
 
-    def get_root(self) -> 'LamodaTreeNode':
-        parent = self
-        while parent:
-            if not parent.parent:
-                break
-            parent = parent.parent
+    if cnt < loc['count']:
+        # TODO: Логгирование
+        print(f'Внимание! Из {loc['count']} скачано {cnt}', end='\r', flush=True)
+
+
+def rget_data(links: dict, dir: Path, driver: webdriver.Chrome):
+    for link in links:
+        current_dir = check_folder_create(dir / link)
+        #print(f'Переходим {links[link]}')
+        try_webdriver_get(links[link], driver)
         
-        return parent
+        parent_li = WebDriverWait(driver, 60
+                          ).until(EC.presence_of_element_located((By.XPATH, "//a[contains(@class, 'router-link-exact-active')]/ancestor::li[1]")))
+        try:
+            inner_ul = parent_li.find_element(By.XPATH, ".//ul[not (contains(@style, 'display: none'))]")
+        except NoSuchElementException:
+            location_dict = {}
+            location_dict['name'] = link
+            location_dict['url'] = links[link]
+            location_dict['count'] = parent_li.find_element(By.XPATH, ".//span[contains(@class, '_found_')]")
+            location_dict['count'] = int(location_dict['count'].text.strip())
+            process_items(location_dict, current_dir, driver)
+            continue
+        
+        inner_links = inner_ul.find_elements(By.XPATH, ".//a[@role='link']")
+        inner_links = links_to_dict(inner_links)
+        rget_data(inner_links, current_dir, driver)
+
+
     
 
 class LamodaParser(ChromeParser):
     def __init__(self, *args, **kwargs) -> None:
         chrome_options =(
             '--disable-infobars',
-            '--headless',
+            #'--headless',
             '--ignore-certificate-errors',
             '--no-first-run',
             '--log-level=3',
             '--ignore-certificate-errors-spki-list',
             '--ignore-ssl-errors',
             '--log-level=3',
-            '--window-size=2560,1440'
+            '--window-size=1920,1080',
+            '--disable-blink-features=AutomationControlled'
         )
         super().__init__(*chrome_options)
 
@@ -118,186 +278,23 @@ class LamodaParser(ChromeParser):
         self.__forward_xpath = "//a[contains(@class, 'router-link-active') and descendant::div[text()='Дальше']]"
         self.__card_xpath = '//a[contains(@class, "x-product-card__pic-catalog")]'
         self.__promo1_close = "//div[contains(@class, 'icon_cross-thin-white')]"
-        self.__promo2_close = "//div[@title='Закрыть' and contains(@class, 'icon_cross-thin-white') and ancestor::div[@class='d-modal__close-button']]"
-        self.__img_xpath = "//img[contains(@class, '_image_1') and ancestor::div[contains(@class, 'ui-product-page-gallery')]]"
-        self.__desc_xpath = "//span[ancestor::div[contains(@class, '_description_') and ancestor::div[contains(@id, 'reviews-and-questions')]]]"
         self.__delay_s = kwargs['mdelay']
         self.__fail_wait = 60
         self.__img_dowloaded = 0
         self.__bad_img = 0
         self.__started = 0.0
         self.__finished = 0.0
-        exact_dir = output_dir / f'output_{int(time() * 1000)}'
-        self.__root = LamodaTreeNode('Женская одежда', self.__lamoda_url_w, dir=check_folder_create(exact_dir))
-        responce = try_request(self.__lamoda_url_w)
 
-        soup = BeautifulSoup(responce.text, 'html5lib')
-        base_links = soup.find('ul', 'x-tree-view-catalog-navigation__subtree')
-        base_links = base_links.find_all('a', 'x-link')
-        
-        self.__fill_tree(base_links, self.__root)
-
-        self.__engine = create_engine(f"sqlite:///{str(self.__root.dir)}/db.sqlite3")
-        Base.metadata.create_all(self.__engine)
-        self.__Session = Session(self.__engine)
-
-
-    def __get_card_data(self, url: str, save_pth: Path) -> LamodaItem:
-        try_webdriver_get(url, self._driver)
-        
-        dom = etree_from_driver(self._driver)
-        promo1 = dom.xpath(self.__promo2_close)
-        if len(promo1) > 0:
-            WebDriverWait(self._driver, 60
-                          ).until(EC.element_to_be_clickable((By.XPATH, self.__promo2_close))).click()
-        WebDriverWait(self._driver, 60
-                          ).until(EC.presence_of_element_located((By.XPATH, self.__img_xpath)))
-        dom = etree_from_driver(self._driver)
-        img = dom.xpath(self.__img_xpath)
-        img_url = img[0].attrib['src']
-        img_url = 'https:' + img_url
-
-        item = LamodaItem()
-
-        item.prod_url = url
-        item.img_url = img_url
-        #materials = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-material_filling')]")
-        #item.materials = materials[0].text.strip() if len(materials) > 0 else ''
-        #size_on_model = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-correspond_to_size')]")
-        #item.size_on_model = size_on_model[0].text.strip() if len(size_on_model) > 0 else ''
-        #model_params = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-model_parameters')]")
-        #item.model_params = model_params[0].text.strip() if len(model_params) > 0 else ''
-        #model_heigh = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-model_height_on_photo')]")
-        #item.model_heigh = model_heigh[0].text.strip() if len(model_heigh) > 0 else ''
-        #length = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-length')]")
-        #item.lenght = length[0].text.strip() if len(length) > 0 else ''
-        #season = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-season_wear')]")
-        #item.season = season[0].text.strip() if len(season) > 0 else ''
-        #color = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-color_family')]")
-        #item.color = color[0].text.strip() if len(color) > 0 else ''
-        #cloth_print = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-print')]")
-        #item.print = cloth_print[0].text.strip() if len(cloth_print) > 0 else ''
-        #knitwear = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-type_of_knitwear')]")
-        #item.knitwear = knitwear[0].text.strip() if len(knitwear) > 0 else ''
-        #guarantee = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-guarantee_period')]")
-        #item.guarantee = guarantee[0].text.strip() if len(guarantee) > 0 else ''
-        #prod_country = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-production_country')]")
-        #item.prod_country = prod_country[0].text.strip() if len(prod_country) > 0 else ''
-        #clasp = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-clothes_clasp')]")
-        #item.clasp = clasp[0].text.strip() if len(clasp) > 0 else ''
-
-        price = dom.xpath("//span[contains(@aria-label, 'Итоговая цена')]")
-        try:
-            item.price = price[0].text.strip()
-        except Exception:
-            item.price = ''
-
-        sku = dom.xpath("//span[contains(@class, 'ui-product-description-attribute-sku')]")
-        try:
-            item.sku = sku[0].text.strip()
-        except Exception:
-            item.sku = ''
-  
-        try:
-            description = dom.xpath(self.__desc_xpath)
-            item.description = description[0].text.strip()
-        except:
-            item.description = ''
-
-        img_responce = try_request(img_url)
-        img_path = img_url.split('/')[-1]
-        img_path = save_pth / img_path
-
-        with open(img_path, 'wb') as file:
-            file.write(img_responce.content)
-
-        item.img_rel_path = img_path.relative_to(Path(__file__).parent)
-        
-        return item
-
-    def __fill_tree(self, links: list[BeautifulSoup], tree: LamodaTreeNode) -> dict:
-        for link in links:
-            sleep(self.__delay_s)
-            url = self.__lamoda_url_base + link.get('href')
-            responce = try_request(url)
-            soup = BeautifulSoup(responce.text, 'html5lib')
-            up_li = None
-            div_selected = soup.find('div', self.__selected)
-            parents = [i for i in div_selected.parents]
-            for ptag in parents:
-                if not up_li and ptag.name == 'li':
-                    up_li = ptag
-            
-            tree_node = LamodaTreeNode(link.text.strip(), url)
-            tree.add_child(tree_node)
-
-            inner_ul = up_li.find('ul', self.__subtree)
-            if inner_ul:
-                sublist = inner_ul.findChildren('a', 'x-link')
-                self.__fill_tree(sublist, tree_node)
-            else:
-                tree_node.cnt = int(div_selected.findChild('span', self.__found).text)
-
-
-    def __download_images(self, node: LamodaTreeNode):
-        run = 0
-        forward = []
-        url = node.url
-        while len(forward) > 0 or run == 0:
-            try_webdriver_get(url, self._driver)
-            WebDriverWait(self._driver, 60
-                          ).until(EC.presence_of_element_located((By.XPATH, self.__card_xpath)))
-            
-            self._driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-
-            try:
-                WebDriverWait(self._driver, 20
-                              ).until(EC.presence_of_element_located((By.XPATH, self.__forward_xpath)))
-            except Exception:
-                forward = []
-                #screen_path = self.__root.dir / 'screenshot.png'
-                #self._driver.save_screenshot(screen_path)
-
-            dom = etree.HTML(self._driver.page_source)
-            card_links = dom.xpath(self.__card_xpath)
-            forward = dom.xpath(self.__forward_xpath)
-            
-            if len(card_links) == 0:
-                raise PExeption(f'Ошибка! Не удалось получить список товаров. Структура сайта возможно была изменена.')
-            
-            for link in card_links:
-                sleep(self.__delay_s)
-                href = link.attrib['href']
-                href = self.__lamoda_url_base + href
-                item = self.__get_card_data(href, node.dir)
-                self.__img_dowloaded += 1
-                print(f'Скачано: {self.__img_dowloaded}', end='\r')
-                self.__Session.add(item)
-
-            run += 1
-
-            if len(forward) > 0:
-                forward_link = forward[0].attrib['href']
-                url = self.__lamoda_url_base + forward_link
-
-
-    def __rget_data(self, node: "LamodaTreeNode"):
-  
-        if node.dir is None:
-            node.dir = output_dir / node.data if node.parent is None else node.parent.dir / node.data
-            if not node.dir.exists() or not node.dir.is_dir():
-                node.dir.mkdir()
-
-        if node.cnt > 0:
-            self.__download_images(node)
-
-        for child in node.children:
-            self.__rget_data(child)
 
 
     def start(self, *args, **kwargs) -> None:
         self.__started = time()
-        
-        self.__rget_data(self.__root.get_root())
+        self._driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.53 Safari/537.36'})
+        try_webdriver_get(lamoda_url_w, self._driver)
+        ul = WebDriverWait(self._driver, 60
+                          ).until(EC.presence_of_element_located((By.XPATH, "//ul[@data-v-eff6c8d8='' and descendant::a[@role='link']]")))
+        base_links = ul.find_elements(By.XPATH, ".//a[@role='link']")
+        base_links = links_to_dict(base_links)
+        rget_data(base_links, exact_dir, self._driver)
         self.__finished = time()
         print('Finished!')
