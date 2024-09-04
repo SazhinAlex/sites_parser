@@ -99,7 +99,7 @@ def get_etree_html(url: str, driver: webdriver.Chrome, fail_wait = 5.0, limit = 
     return etree.HTML(str(soup))
 
 
-def get_card_data(url: str, save_pth: Path, driver: webdriver.Chrome) -> LamodaItem:
+def get_card_data(url: str, save_pth: Path, driver: webdriver.Chrome) -> LamodaItem|None:
     try_webdriver_get(url, driver)
     
     promo = driver.find_elements(By.XPATH, promo2_close)
@@ -216,10 +216,14 @@ def process_items(loc: dict, dir: Path, driver: webdriver.Chrome):
         hrefs = [a.get_attribute('href') for a in cards]
         for href in hrefs:
             item = get_card_data(href, dir, driver)
-            Session.add(item)
-            Session.commit()
-            cnt += 1
-            print(f'Скачано: {cnt}', end='\r', flush=True)
+            if item is not None:
+                Session.add(item)
+                Session.commit()
+                cnt += 1
+                print(f'Скачано: {cnt}', end='\r', flush=True)
+            else:
+                # TODO: Логгирование
+                print(f'Внимание! Не удалось получить данные карточки товара: {href}')
 
         run += 1
 
