@@ -105,8 +105,10 @@ def get_card_data(url: str, save_pth: Path, driver: webdriver.Chrome) -> LamodaI
     promo = driver.find_elements(By.XPATH, promo2_close)
     if len(promo) > 0:
         WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, promo2_close))).click()
-
-    imgs = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, img_xpath)))
+    try:
+        imgs = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, img_xpath)))
+    except TimeoutException:
+        return None
     img_url = imgs[0].get_attribute('src')
 
     item = LamodaItem()
