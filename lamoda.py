@@ -237,7 +237,9 @@ def rget_data(links: dict, dir: Path, driver: webdriver.Chrome):
         current_dir = check_folder_create(dir / link)
         #print(f'Переходим {links[link]}')
         try_webdriver_get(links[link], driver)
-        
+        promo = driver.find_elements(By.XPATH, promo2_close)
+        if len(promo) > 0:
+            WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, promo2_close))).click()
         parent_li = WebDriverWait(driver, 60
                           ).until(EC.presence_of_element_located((By.XPATH, "//a[contains(@class, 'router-link-exact-active')]/ancestor::li[1]")))
         try:
