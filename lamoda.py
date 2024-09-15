@@ -3,14 +3,15 @@ from pathlib import Path
 from time import time, sleep
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
-from sqlalchemy import create_engine, Column, String, Integer
-from sqlalchemy.orm import declarative_base, Session
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, TimeoutException
 from lxml import etree
+from db import LamodaItem, Base
 import os
 import sys
 
@@ -24,40 +25,9 @@ lamoda_url_w = 'https://www.lamoda.ru/c/355/clothes-zhenskaya-odezhda/'
 card_link = "//a[@role='link' and contains(@class, 'x-product-card__pic-catalog')]"
 forward_xpath = "//a[contains(@class, 'router-link-active') and descendant::div[text()='Дальше']]"
 sub_arrow = ".//div[contains(@class, 'ui-catalog-tree-arrow-icon-level-2')]"
-exact_dir = check_folder_create(output_dir / f'output_{int(time() * 1000)}')
-engine = create_engine(f"sqlite:///{str(exact_dir)}/db.sqlite3")
-Base = declarative_base()
+
 run = False
 
-
-
-
-class LamodaItem(Base):
-    __tablename__ = "LamodaItem"
-
-    id = Column(Integer, primary_key=True)
-    img_rel_path = Column(String)
-    materials = Column(String)
-    size_on_model = Column(String)
-    model_params = Column(String)
-    model_heigh = Column(String)
-    lenght = Column(String)
-    season = Column(String)
-    color = Column(String)
-    print = Column(String)
-    knitwear = Column(String)
-    guarantee = Column(String)
-    prod_country = Column(String)
-    clasp = Column(String)
-    sku = Column(String)
-    price = Column(String)
-    description = Column(String)
-    prod_url = Column(String)
-    img_url = Column(String)
-
-
-Base.metadata.create_all(engine)
-Session = Session(engine)
 
 
 def links_to_dict(links: list[WebElement]) -> dict:
@@ -200,78 +170,6 @@ def get_card_data(url: str, save_pth: Path, driver: webdriver.Chrome) -> LamodaI
     return item
 
 
-def process_items(loc: dict, dir: Path, driver: webdriver.Chrome):
-    cnt = 0
-    url_togo = loc['url']
-    forward = None
-    run = 0
-    while forward or run == 0:
-        try_webdriver_get(url_togo, driver)
-        cards = WebDriverWait(driver, 60).until(EC.presence_of_all_elements_located((By.XPATH, card_link)))
-        try:
-            forward = WebDriverWait(
-                driver, 
-                10, 
-                ignored_exceptions=(NoSuchElementException, TimeoutException)
-                ).until(EC.presence_of_element_located((By.XPATH, forward_xpath)))
-        except TimeoutException:
-            forward = None
-
-        if forward:
-            url_togo = forward.get_attribute('href')
-        hrefs = [a.get_attribute('href') for a in cards]
-        for href in hrefs:
-            item = get_card_data(href, dir, driver)
-            if item is not None:
-                Session.add(item)
-                Session.commit()
-                cnt += 1
-                sys.stdout.write('\033[2K\033[1G')
-                print(f'{str(dir.relative_to(exact_dir)).replace(os.sep, '/')} Скачано: {cnt}', end='', flush=True)
-            else:
-                # TODO: Логгирование
-                print(f'Внимание! Не удалось получить данные карточки товара: {href}')
-
-        run += 1
-
-    if cnt < loc['count']:
-        # TODO: Логгирование
-        print(f'Внимание! Из {loc['count']} скачано {cnt}', end='\r', flush=True)
-
-
-def rget_data(links: dict, dir: Path, driver: webdriver.Chrome, begin: str|None = None):
-    global run
-    for link in links:
-        current_dir = check_folder_create(dir / link)
-        #print(f'Переходим {links[link]}')
-        try_webdriver_get(links[link], driver)
-        promo = driver.find_elements(By.XPATH, promo2_close)
-        if len(promo) > 0:
-            WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, promo2_close))).click()
-        parent_li = WebDriverWait(driver, 60).until(
-            EC.presence_of_element_located((By.XPATH, "//a[contains(@class, 'router-link-exact-active')]/ancestor::li[1]")))
-        inner_ul = parent_li.find_elements(By.XPATH, ".//ul[not (contains(@style, 'display: none'))]")
-        if len(inner_ul) == 0:
-            if begin is not None:
-                if not run and str(current_dir.relative_to(exact_dir)).replace(os.sep, '/') == begin:
-                    run = True
-                if not run:
-                    continue
-            location_dict = {}
-            location_dict['name'] = link
-            location_dict['url'] = links[link]
-            location_dict['count'] = parent_li.find_element(By.XPATH, ".//span[contains(@class, '_found_')]")
-            location_dict['count'] = int(location_dict['count'].text.strip())
-            process_items(location_dict, current_dir, driver)
-            print()
-            continue
-        
-        inner_links = inner_ul[0].find_elements(By.XPATH, ".//a[@role='link']")
-        inner_links = links_to_dict(inner_links)
-        rget_data(inner_links, current_dir, driver, begin)
-
-
-    
 
 class LamodaParser(ChromeParser):
     def __init__(self, *args, **kwargs) -> None:
@@ -289,21 +187,96 @@ class LamodaParser(ChromeParser):
         )
         super().__init__(*chrome_options)
 
-        self.__lamoda_url_w = 'https://www.lamoda.ru/c/355/clothes-zhenskaya-odezhda/'
-        self.__lamoda_url_base = 'https://www.lamoda.ru'
-        self.__selected = 'x-tree-view-catalog-navigation__category_selected'
-        self.__subtree = 'x-tree-view-catalog-navigation__subtree'
-        self.__found = 'x-tree-view-catalog-navigation__found'
-        self.__forward_xpath = "//a[contains(@class, 'router-link-active') and descendant::div[text()='Дальше']]"
-        self.__card_xpath = '//a[contains(@class, "x-product-card__pic-catalog")]'
-        self.__promo1_close = "//div[contains(@class, 'icon_cross-thin-white')]"
-        self.__fail_wait = 60
-        self.__img_dowloaded = 0
-        self.__bad_img = 0
+        exact_dir = output_dir / f'output_{int(time() * 1000)}'
+        if 'begin_dir' in kwargs and kwargs['begin_dir'] is not None:
+            sql_s = Path(kwargs['begin_dir'])
+            if sql_s.is_dir() and sql_s.exists():
+                exact_dir = sql_s
+        self.__exact_dir = check_folder_create(exact_dir)
+        sql_uri = f"sqlite:///{str(self.__exact_dir)}/db.sqlite3"
+        
+        self.__engine = create_engine(sql_uri)
+        
+        
         self.__started = 0.0
         self.__finished = 0.0
+        self.__run = False
         self.__delay_s = kwargs['mdelay']
         self.__begin_cat = kwargs['begin'] if 'begin' in kwargs else None
+        Base.metadata.create_all(self.__engine)
+        self.__Session = Session(self.__engine)
+
+
+
+    def __process_items(self, loc: dict, dir: Path, driver: webdriver.Chrome):
+        cnt = 0
+        url_togo = loc['url']
+        forward = None
+        run = 0
+        while forward or run == 0:
+            try_webdriver_get(url_togo, driver)
+            cards = WebDriverWait(driver, 60).until(EC.presence_of_all_elements_located((By.XPATH, card_link)))
+            try:
+                forward = WebDriverWait(
+                    driver, 
+                    10, 
+                    ignored_exceptions=(NoSuchElementException, TimeoutException)
+                    ).until(EC.presence_of_element_located((By.XPATH, forward_xpath)))
+            except TimeoutException:
+                forward = None
+
+            if forward:
+                url_togo = forward.get_attribute('href')
+            hrefs = [a.get_attribute('href') for a in cards]
+            for href in hrefs:
+                item = get_card_data(href, dir, driver)
+                if item is not None:
+                    self.__Session.add(item)
+                    self.__Session.commit()
+                    cnt += 1
+                    sys.stdout.write('\033[2K\033[1G')
+                    print(f'{str(dir.relative_to(exact_dir)).replace(os.sep, '/')} Скачано: {cnt}', end='', flush=True)
+                else:
+                    # TODO: Логгирование
+                    print(f'Внимание! Не удалось получить данные карточки товара: {href}')
+
+            run += 1
+
+        if cnt < loc['count']:
+            # TODO: Логгирование
+            print(f'Внимание! Из {loc['count']} скачано {cnt}', end='\r', flush=True)
+
+
+
+    def __rget_data(self, links: dict, dir: Path, driver: webdriver.Chrome, begin: str|None = None):
+        for link in links:
+            current_dir = check_folder_create(dir / link)
+            #print(f'Переходим {links[link]}')
+            try_webdriver_get(links[link], driver)
+            promo = driver.find_elements(By.XPATH, promo2_close)
+            if len(promo) > 0:
+                WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, promo2_close))).click()
+            parent_li = WebDriverWait(driver, 60).until(
+                EC.presence_of_element_located((By.XPATH, "//a[contains(@class, 'router-link-exact-active')]/ancestor::li[1]")))
+            inner_ul = parent_li.find_elements(By.XPATH, ".//ul[not (contains(@style, 'display: none'))]")
+            if len(inner_ul) == 0:
+                if begin is not None:
+                    if not self.__run and str(current_dir.relative_to(self.__exact_dir)).replace(os.sep, '/') == begin:
+                        self.__run = True
+                    if not self.__run:
+                        continue
+                location_dict = {}
+                location_dict['name'] = link
+                location_dict['url'] = links[link]
+                location_dict['count'] = parent_li.find_element(By.XPATH, ".//span[contains(@class, '_found_')]")
+                location_dict['count'] = int(location_dict['count'].text.strip())
+                self.__process_items(location_dict, current_dir, driver)
+                print()
+                continue
+            
+            inner_links = inner_ul[0].find_elements(By.XPATH, ".//a[@role='link']")
+            inner_links = links_to_dict(inner_links)
+            self.__rget_data(inner_links, current_dir, driver, begin)
 
 
 
@@ -315,6 +288,6 @@ class LamodaParser(ChromeParser):
                           ).until(EC.presence_of_element_located((By.XPATH, "//ul[@data-v-eff6c8d8='' and descendant::a[@role='link']]")))
         base_links = ul.find_elements(By.XPATH, ".//a[@role='link']")
         base_links = links_to_dict(base_links)
-        rget_data(base_links, exact_dir, self._driver, self.__begin_cat)
+        self.__rget_data(base_links, self.__exact_dir, self._driver, self.__begin_cat)
         self.__finished = time()
         print('Finished!')
