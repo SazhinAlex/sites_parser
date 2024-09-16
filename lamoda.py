@@ -249,6 +249,7 @@ class LamodaParser(ChromeParser):
 
 
     def __rget_data(self, links: dict, dir: Path, driver: webdriver.Chrome, begin: str|None = None):
+        sleep(2)
         for link in links:
             current_dir = check_folder_create(dir / link)
             #print(f'Переходим {links[link]}')
