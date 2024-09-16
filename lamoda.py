@@ -235,7 +235,7 @@ class LamodaParser(ChromeParser):
                     self.__Session.commit()
                     cnt += 1
                     sys.stdout.write('\033[2K\033[1G')
-                    print(f'{str(dir.relative_to(exact_dir)).replace(os.sep, '/')} Скачано: {cnt}', end='', flush=True)
+                    print(f'{str(dir.relative_to(self.__exact_dir)).replace(os.sep, '/')} Скачано: {cnt}', end='', flush=True)
                 else:
                     # TODO: Логгирование
                     print(f'Внимание! Не удалось получить данные карточки товара: {href}')
