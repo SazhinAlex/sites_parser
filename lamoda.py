@@ -14,6 +14,7 @@ from lxml import etree
 from db import LamodaItem, Base
 import os
 import sys
+import re
 
 
 
@@ -54,11 +55,14 @@ def try_webdriver_get(url: str, driver: webdriver.Chrome, fail_wait = 120.0, lim
     while counter < limit:
         try:
             driver.get(url)
+            if re.match(r'^4[0-9]{2}$', driver.title) is None:
+                raise Exception()
             break
         except Exception:
             counter += 1
             if counter == limit:
                 raise PExeption(f'После {counter} попыток не удалось получить данные с {url} Работа завершена.')
+            print(f'Не удалось получить данные с {url}! Ждем {fail_wait}с и пробуем снова...')
             sleep(fail_wait)
 
 
