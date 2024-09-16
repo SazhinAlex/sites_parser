@@ -55,7 +55,7 @@ def try_webdriver_get(url: str, driver: webdriver.Chrome, fail_wait = 120.0, lim
     while counter < limit:
         try:
             driver.get(url)
-            if re.match(r'^4[0-9]{2}$', driver.title) is None:
+            if re.search(r'\s4[0-9]{2}$', 'HTTP 404') is not None:
                 raise Exception()
             break
         except Exception:
