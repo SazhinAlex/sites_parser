@@ -5,7 +5,7 @@ from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
-from selenium import webdriver
+import undetected_chromedriver as webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.remote.webelement import WebElement
@@ -188,7 +188,7 @@ class LamodaParser(ChromeParser):
 
         if 'proxy_server' in kwargs and kwargs['proxy_server'] is not None:
             chrome_options.append('--proxy-server=' + kwargs['proxy_server'])
-            
+
         super().__init__(*chrome_options)
 
         exact_dir = output_dir / f'output_{int(time() * 1000)}'

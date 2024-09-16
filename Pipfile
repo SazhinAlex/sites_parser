@@ -9,6 +9,8 @@ requests = "*"
 beautifulsoup4 = "*"
 html5lib = "*"
 sqlalchemy = "*"
+undetected-chromedriver = "*"
+setuptools = "*"
 
 [dev-packages]
 

@@ -1,4 +1,4 @@
-from selenium import webdriver
+import undetected_chromedriver as webdriver
 from pathlib import Path
 import requests
 from time import sleep, time
@@ -32,14 +32,14 @@ def check_folder_create(pth: Path) -> Path:
 class ChromeParser(object):
     def __init__(self, *args, **kwargs) -> None:
         options = webdriver.ChromeOptions()
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option('useAutomationExtension', False)
+        #options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        #options.add_experimental_option('useAutomationExtension', False)
         for arg in args:
             options.add_argument(arg)
 
-        self._driver = webdriver.Chrome(options=options)
-        self._driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-        self._driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0'})
+        self._driver = webdriver.Chrome()
+        #self._driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        #self._driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0'})
         self._driver.set_page_load_timeout(30)
 
     
