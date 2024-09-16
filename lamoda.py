@@ -173,7 +173,7 @@ def get_card_data(url: str, save_pth: Path, driver: webdriver.Chrome) -> LamodaI
 
 class LamodaParser(ChromeParser):
     def __init__(self, *args, **kwargs) -> None:
-        chrome_options =(
+        chrome_options =[
             '--disable-infobars',
             #'--headless',
             '--ignore-certificate-errors',
@@ -184,8 +184,11 @@ class LamodaParser(ChromeParser):
             '--log-level=3',
             '--window-size=1920,1080',
             '--disable-blink-features=AutomationControlled',
-            '--proxy-server=103.63.190.37:8080'
-        )
+        ]
+
+        if 'proxy_server' in kwargs and kwargs['proxy_server'] is not None:
+            chrome_options.append('--proxy-server=' + kwargs['proxy_server'])
+            
         super().__init__(*chrome_options)
 
         exact_dir = output_dir / f'output_{int(time() * 1000)}'
