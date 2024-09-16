@@ -233,6 +233,7 @@ class LamodaParser(ChromeParser):
                 url_togo = forward.get_attribute('href')
             hrefs = [a.get_attribute('href') for a in cards]
             for href in hrefs:
+                sleep(1)
                 item = get_card_data(href, dir, driver)
                 if item is not None:
                     self.__Session.add(item)
@@ -253,7 +254,7 @@ class LamodaParser(ChromeParser):
 
 
     def __rget_data(self, links: dict, dir: Path, driver: webdriver.Chrome, begin: str|None = None):
-        sleep(2)
+        sleep(1)
         for link in links:
             current_dir = check_folder_create(dir / link)
             #print(f'Переходим {links[link]}')
