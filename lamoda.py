@@ -169,6 +169,9 @@ def get_card_data(url: str, save_pth: Path, driver: webdriver.Chrome) -> LamodaI
     with open(img_path, 'wb') as file:
         file.write(img_responce.content)
 
+    img_rel_path = str(img_path.relative_to(Path(__file__).parent))
+    if os.sep != '/':
+        img_rel_path = str(img_path.relative_to(Path(__file__).parent)).replace(os.sep, '/')
     item.img_rel_path = str(img_path.relative_to(Path(__file__).parent))
     
     return item
@@ -213,6 +216,7 @@ class LamodaParser(ChromeParser):
         self.__begin_cat = kwargs['begin'] if 'begin' in kwargs else None
         Base.metadata.create_all(self.__engine)
         self.__Session = Session(self.__engine)
+        self.__Session.rollback()
 
 
 
@@ -241,7 +245,7 @@ class LamodaParser(ChromeParser):
                 item = get_card_data(href, dir, driver)
                 if item is not None:
                     self.__Session.add(item)
-                    self.__Session.commit()
+                    #self.__Session.commit()
                     cnt += 1
                     sys.stdout.write('\033[2K\033[1G')
                     print(f'{str(dir.relative_to(self.__exact_dir)).replace(os.sep, '/')} Скачано: {cnt}', end='', flush=True)
@@ -281,6 +285,7 @@ class LamodaParser(ChromeParser):
                 location_dict['count'] = parent_li.find_element(By.XPATH, ".//span[contains(@class, '_found_')]")
                 location_dict['count'] = int(location_dict['count'].text.strip())
                 self.__process_items(location_dict, current_dir, driver)
+                self.__Session.commit()
                 print()
                 continue
             
