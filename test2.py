@@ -1,9 +1,18 @@
-from db import LamodaItem, Base
-from pathlib import Path
+import undetected_chromedriver as uc
+from time import sleep
 
 
-pth = ''
+pth = 'https://www.lamoda.ru/c/355/clothes-zhenskaya-odezhda/'
 
 
 if __name__ == '__main__':
-    pass
+    options = uc.ChromeOptions()
+    options.add_argument('--headless')
+
+    # Set up WebDriver
+
+    driver = uc.Chrome()
+    driver.get(pth)
+    print(driver.title)
+    #driver.quit()
+    sleep(2000)

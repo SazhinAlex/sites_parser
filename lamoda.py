@@ -228,11 +228,22 @@ class LamodaParser(ChromeParser):
         while forward or run == 0:
             try_webdriver_get(url_togo, driver)
             cards = WebDriverWait(driver, 60).until(EC.presence_of_all_elements_located((By.XPATH, card_link)))
+
+            while True:
+                h_last_card = cards[-1].location['y']
+                driver.execute_script(f"window.scrollTo(0, {h_last_card});")
+                sleep(10)
+                turn_cards = WebDriverWait(driver, 60).until(EC.presence_of_all_elements_located((By.XPATH, card_link)))
+                if len(turn_cards) > len(cards):
+                    cards = turn_cards
+                    continue
+                break
+
             try:
                 forward = WebDriverWait(
                     driver, 
                     10, 
-                    ignored_exceptions=(NoSuchElementException, TimeoutException)
+                    #ignored_exceptions=(NoSuchElementException, TimeoutException)
                     ).until(EC.presence_of_element_located((By.XPATH, forward_xpath)))
             except TimeoutException:
                 forward = None
@@ -257,7 +268,7 @@ class LamodaParser(ChromeParser):
 
         if cnt < loc['count']:
             # TODO: Логгирование
-            print(f'Внимание! Из {loc['count']} скачано {cnt}', end='\r', flush=True)
+            print(f' Внимание! Из {loc['count']} скачано {cnt}', end='\r', flush=True)
 
 
 
