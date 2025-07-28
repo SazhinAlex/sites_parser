@@ -48,6 +48,10 @@ class ChromeParser(object):
     def start(self, *args, **kwargs) -> None:
         raise NotImplementedError
     
+    def __del__(self):
+        self._driver.quit()
+        print('Драйвер закрыт')
+    
 
 class PExeption(Exception):
     def __init__(self, etext = 'Ошибка! Возможно структура сайта была изменена...') -> None:

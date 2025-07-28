@@ -12,6 +12,7 @@ sqlalchemy = "*"
 selenium-stealth = "*"
 undetected-chromedriver = "*"
 setuptools = "*"
+iteration-utilities = "*"
 
 [dev-packages]
 

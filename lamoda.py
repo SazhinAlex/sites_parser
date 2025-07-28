@@ -12,10 +12,10 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, TimeoutException
 from lxml import etree
 from db import LamodaItem, Base
+from iteration_utilities import duplicates
+import undetected_chromedriver as uc
 import os
-import sys
 import re
-
 
 
 downloaded = 0
@@ -26,9 +26,39 @@ lamoda_url_w = 'https://www.lamoda.ru/c/355/clothes-zhenskaya-odezhda/'
 card_link = "//a[@role='link' and contains(@class, 'x-product-card__pic-catalog')]"
 forward_xpath = "//a[contains(@class, 'router-link-active') and descendant::div[text()='Дальше']]"
 sub_arrow = ".//div[contains(@class, 'ui-catalog-tree-arrow-icon-level-2')]"
-
+grid_catalog = "//div[contains(@class, 'grid__catalog')]"
 run = False
 
+
+class CategoryError(PExeption):
+    def __init__(self, 
+                 loc_dict: dict, 
+                 base_img_dir: Path, 
+                 pth: Path, 
+                 downloaded: int, 
+                 total: int, 
+                 etext='Ошибка! Категория товаров не получена!'):
+        
+        super().__init__(etext)
+        self.pth = pth
+        self.downloaded = downloaded
+        self.total = total
+        self.base_img_dir = base_img_dir
+
+
+
+def retreive_grid_catalog_height(driver: uc.Chrome, tries: int = 20, delay_s = 1):
+    done_cnt = 0
+    while done_cnt < tries:
+        try:
+            grid_catalog = driver.find_element(By.XPATH, "//div[contains(@class, 'grid__catalog')]")
+            return grid_catalog.rect['height']
+        except Exception:
+            done_cnt += 1
+            log_str = f' Попытка собрать данные №{done_cnt} Ждем {delay_s}с. и пробуем снова...'
+            print(log_str, end='\r', flush=True)
+            sleep(delay_s)
+            
 
 
 def links_to_dict(links: list[WebElement]) -> dict:
@@ -208,80 +238,86 @@ class LamodaParser(ChromeParser):
         
         self.__engine = create_engine(sql_uri)
         
-        
-        self.__started = 0.0
-        self.__finished = 0.0
         self.__run = False
         self.__delay_s = kwargs['mdelay']
         self.__begin_cat = kwargs['begin'] if 'begin' in kwargs else None
         Base.metadata.create_all(self.__engine)
         self.__Session = Session(self.__engine)
         self.__Session.rollback()
+        self.__cards_links = []
 
-
-
-    def __process_items(self, loc: dict, dir: Path, driver: webdriver.Chrome):
+    
+    
+    def __process_items(self, loc: dict, dir: Path):
         cnt = 0
         url_togo = loc['url']
         forward = None
         run = 0
-        while forward or run == 0:
-            try_webdriver_get(url_togo, driver)
-            cards = WebDriverWait(driver, 60).until(EC.presence_of_all_elements_located((By.XPATH, card_link)))
+        cards_links = {'pth': dir, 'links': []}
+        SCROLL_PAUSE_TIME = 30
+        grid_cat_cnt = 0
 
+        
+        # Get scroll heigh
+        last_height = retreive_grid_catalog_height(self._driver)
+
+        while forward is not None or run == 0:
+            if url_togo != self._driver.current_url:
+                try_webdriver_get(url_togo, self._driver)
             while True:
-                h_last_card = cards[-1].location['y']
-                driver.execute_script(f"window.scrollTo(0, {h_last_card});")
-                sleep(10)
-                turn_cards = WebDriverWait(driver, 60).until(EC.presence_of_all_elements_located((By.XPATH, card_link)))
-                if len(turn_cards) > len(cards):
-                    cards = turn_cards
-                    continue
-                break
+            # Scroll down to bottom
+                self._driver.execute_script(f"window.scrollTo(0, {last_height});")
+
+                # Wait to load page
+                sleep(SCROLL_PAUSE_TIME)
+
+                # Calculate new scroll height and compare with last scroll height
+                new_height = retreive_grid_catalog_height(self._driver)
+                if new_height == last_height:
+                    break
+                last_height = new_height
+
+            cards = WebDriverWait(self._driver, 60).until(EC.presence_of_all_elements_located((By.XPATH, card_link)))
+            for a in cards:
+                card_lnk = a.get_attribute('href').strip()
+                if card_lnk not in cards_links['links']:
+                    cards_links['links'].append(card_lnk)
+                    cnt += 1
 
             try:
                 forward = WebDriverWait(
-                    driver, 
+                    self._driver, 
                     10, 
                     #ignored_exceptions=(NoSuchElementException, TimeoutException)
                     ).until(EC.presence_of_element_located((By.XPATH, forward_xpath)))
-            except TimeoutException:
-                forward = None
-
-            if forward:
                 url_togo = forward.get_attribute('href')
-            hrefs = [a.get_attribute('href') for a in cards]
-            for href in hrefs:
-                sleep(1)
-                item = get_card_data(href, dir, driver)
-                if item is not None:
-                    self.__Session.add(item)
-                    #self.__Session.commit()
-                    cnt += 1
-                    sys.stdout.write('\033[2K\033[1G')
-                    print(f'{str(dir.relative_to(self.__exact_dir)).replace(os.sep, '/')} Скачано: {cnt}', end='', flush=True)
-                else:
-                    # TODO: Логгирование
-                    print(f'Внимание! Не удалось получить данные карточки товара: {href}')
+            except Exception:
+                forward = None
 
             run += 1
 
-        if cnt < loc['count']:
-            # TODO: Логгирование
-            print(f' Внимание! Из {loc['count']} скачано {cnt}', end='\r', flush=True)
+        # TODO: Логгирование
+        log_str = f' {str(dir.relative_to(self.__exact_dir))} Из {loc['count']} скачано {cnt}'
+        print(log_str, end='\r', flush=True)
+        
+        if cnt < (loc['count'] * 0.8):
+            ex_text = f'Внимане! Категория {str(dir.relative_to(self.__exact_dir))} не получена. Пауза 120 минут и перезапуск...'
+            raise CategoryError(self.__exact_dir, dir, cnt, loc['count'], ex_text)
+        
+        self.__cards_links.append(cards_links)
 
 
 
-    def __rget_data(self, links: dict, dir: Path, driver: webdriver.Chrome, begin: str|None = None):
+    def __rget_data(self, links: dict, dir: Path, begin: str|None = None):
         sleep(1)
         for link in links:
             current_dir = check_folder_create(dir / link)
             #print(f'Переходим {links[link]}')
-            try_webdriver_get(links[link], driver)
-            promo = driver.find_elements(By.XPATH, promo2_close)
+            try_webdriver_get(links[link], self._driver)
+            promo = self._driver.find_elements(By.XPATH, promo2_close)
             if len(promo) > 0:
-                WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, promo2_close))).click()
-            parent_li = WebDriverWait(driver, 60).until(
+                WebDriverWait(self._driver, 10).until(EC.element_to_be_clickable((By.XPATH, promo2_close))).click()
+            parent_li = WebDriverWait(self._driver, 60).until(
                 EC.presence_of_element_located((By.XPATH, "//a[contains(@class, 'router-link-exact-active')]/ancestor::li[1]")))
             inner_ul = parent_li.find_elements(By.XPATH, ".//ul[not (contains(@style, 'display: none'))]")
             if len(inner_ul) == 0:
@@ -295,24 +331,54 @@ class LamodaParser(ChromeParser):
                 location_dict['url'] = links[link]
                 location_dict['count'] = parent_li.find_element(By.XPATH, ".//span[contains(@class, '_found_')]")
                 location_dict['count'] = int(location_dict['count'].text.strip())
-                self.__process_items(location_dict, current_dir, driver)
-                self.__Session.commit()
+                while True:
+                    try:
+                        self.__process_items(location_dict, current_dir)
+                    except Exception as ex:
+                        print(f'не удалось получить данные с категории {location_dict['name']} Ждем и пробуем еще раз...')
+                        self._driver.quit()
+                        sleep(600)
+                        self._driver = uc.Chrome()
+                        self._driver.set_page_load_timeout(30)
+                        try_webdriver_get(location_dict['url'], self._driver)
+                        continue
+                    break
+
                 print()
                 continue
             
             inner_links = inner_ul[0].find_elements(By.XPATH, ".//a[@role='link']")
             inner_links = links_to_dict(inner_links)
-            self.__rget_data(inner_links, current_dir, driver, begin)
+            self.__rget_data(inner_links, current_dir, begin)
 
 
 
     def start(self, *args, **kwargs) -> None:
-        self.__started = time()
         try_webdriver_get(lamoda_url_w, self._driver)
         ul = WebDriverWait(self._driver, 60
                           ).until(EC.presence_of_element_located((By.XPATH, "//ul[@data-v-eff6c8d8='' and descendant::a[@role='link']]")))
         base_links = ul.find_elements(By.XPATH, ".//a[@role='link']")
         base_links = links_to_dict(base_links)
-        self.__rget_data(base_links, self.__exact_dir, self._driver, self.__begin_cat)
-        self.__finished = time()
+        self.__rget_data(base_links, self.__exact_dir, self.__begin_cat)
+        last_cat_mark = None
+        done = 0
+        for card in self.__cards_links:
+            item = get_card_data()
+            self.__Session.add(item)
+            self.__Session.commit()
+            cat_mark = str(card['dir'].relative_to(self.__exact_dir)).strip()
+            if last_cat_mark != cat_mark:
+                last_cat_mark = cat_mark
+                done = 1
+            else:
+                done += 1
+
+            print(f'{last_cat_mark} Скачано: {done}')
+            print("\033[K", end="\r")
+
+        
         print('Finished!')
+
+
+    def terminate(self, *args, **kwargs) -> None:
+        self._driver.quit()
