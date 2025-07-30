@@ -10,7 +10,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, TimeoutException
-from lxml import etree
 from db import LamodaItem, Base
 import os
 import sys
@@ -64,17 +63,6 @@ def try_webdriver_get(url: str, driver: webdriver.Chrome, fail_wait = 120.0, lim
                 raise PExeption(f'После {counter} попыток не удалось получить данные с {url} Работа завершена.')
             print(f'Не удалось получить данные с {url}! Ждем {fail_wait}с и пробуем снова...')
             sleep(fail_wait)
-
-
-def etree_from_driver(driver: webdriver.Chrome):
-    soup = BeautifulSoup(driver.page_source, 'lxml')
-    return etree.HTML(str(soup))
-
-
-def get_etree_html(url: str, driver: webdriver.Chrome, fail_wait = 5.0, limit = 5):
-    try_webdriver_get(url, driver, fail_wait, limit)
-    soup = BeautifulSoup(driver.page_source, 'lxml')
-    return etree.HTML(str(soup))
 
 
 def get_card_data(url: str, save_pth: Path, driver: webdriver.Chrome) -> LamodaItem|None:
